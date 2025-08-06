@@ -3,7 +3,7 @@ import pandas as pd
 from io import StringIO
 
 st.set_page_config(page_title="CSV Cleaner", layout="wide")
-st.title("📂 CSV Cleaner App: Remove Rows with -9999.0")
+st.title("📂 CSV Cleaner App")
 
 # File upload
 uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
