@@ -2,89 +2,90 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from io import StringIO
- 
+
 st.set_page_config(page_title="CSV Cleaner & Chart App", layout="wide")
 st.title("📂 CSV Cleaner & Chart App")
 
-# Upload CSV file
+# Upload CSV
 uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
 
-if uploaded_file is not None:
+# Initialize session state variables
+if "cleaned_data" not in st.session_state:
+    st.session_state.cleaned_data = None
+if "show_chart" not in st.session_state:
+    st.session_state.show_chart = False
+
+if uploaded_file:
     try:
-        # Read the CSV
         df = pd.read_csv(uploaded_file)
         st.success("✅ CSV file uploaded successfully!")
-
         st.subheader("🔍 Original Data Preview")
         st.dataframe(df, use_container_width=True)
 
-        # Clean data
-        if st.button("🧹 Clean File (Remove Rows with -9999.0)"):
+        if st.button("🧹 Clean File (Remove -9999.0 rows)"):
             df_cleaned = df.replace(-9999.0, pd.NA).dropna()
-
             if df_cleaned.empty:
                 st.warning("⚠️ All rows were removed after cleaning.")
             else:
+                st.session_state.cleaned_data = df_cleaned
                 st.success(f"✅ Cleaned data has {len(df_cleaned)} rows.")
-                st.subheader("📋 Cleaned Data Preview")
-                st.dataframe(df_cleaned, use_container_width=True)
 
-                # Download cleaned CSV
-                csv = df_cleaned.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Cleaned CSV",
-                    data=csv,
-                    file_name="cleaned_file.csv",
-                    mime="text/csv"
-                )
+        # If cleaned data is available
+        if st.session_state.cleaned_data is not None:
+            df_cleaned = st.session_state.cleaned_data
+            st.subheader("📋 Cleaned Data Preview")
+            st.dataframe(df_cleaned, use_container_width=True)
 
-                # --------------------------------------
-                # 📊 Chart Generation Section
-                st.markdown("---")
-                st.subheader("📊 Create a Chart from Cleaned Data")
+            # Download button
+            csv = df_cleaned.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Cleaned CSV",
+                data=csv,
+                file_name="cleaned_file.csv",
+                mime="text/csv"
+            )
 
-                # Get numeric columns only
-                numeric_cols = df_cleaned.select_dtypes(include=["int64", "float64"]).columns.tolist()
+            st.markdown("---")
+            st.subheader("📊 Create a Chart from Cleaned Data")
 
-                if len(numeric_cols) < 2:
-                    st.info("❗ Not enough numeric columns to generate charts.")
-                else:
-                    # Step 1: Select X column
-                    x_axis = st.selectbox("Select X-axis column", numeric_cols, key="x_axis")
+            # Numeric columns for charting
+            numeric_cols = df_cleaned.select_dtypes(include=["float64", "int64"]).columns.tolist()
 
-                    # Step 2: Select Y column (different from X)
-                    y_axis_options = [col for col in numeric_cols if col != x_axis]
-                    y_axis = st.selectbox("Select Y-axis column", y_axis_options, key="y_axis")
+            if len(numeric_cols) < 2:
+                st.info("❗ Not enough numeric columns to generate a chart.")
+            else:
+                x_col = st.selectbox("Select X-axis column", numeric_cols, key="xcol")
+                y_options = [col for col in numeric_cols if col != x_col]
+                y_col = st.selectbox("Select Y-axis column", y_options, key="ycol")
+                chart_type = st.radio("Select Chart Type", ["Line", "Bar", "Scatter"], horizontal=True)
 
-                    # Step 3: Select Chart Type
-                    chart_type = st.radio("Select Chart Type", ["Line", "Bar", "Scatter"], horizontal=True)
+                # Button to generate chart
+                if st.button("📈 Generate Chart"):
+                    st.session_state.show_chart = True
 
-                    # Step 4: Generate chart on button click
-                    if st.button("📈 Generate Chart"):
-                        chart_data = df_cleaned[[x_axis, y_axis]]
-                        
-                        if chart_type == "Line":
-                            chart = alt.Chart(chart_data).mark_line().encode(
-                                x=x_axis,
-                                y=y_axis,
-                                tooltip=[x_axis, y_axis]
-                            ).interactive()
+                if st.session_state.show_chart:
+                    chart_data = df_cleaned[[x_col, y_col]]
 
-                        elif chart_type == "Bar":
-                            chart = alt.Chart(chart_data).mark_bar().encode(
-                                x=x_axis,
-                                y=y_axis,
-                                tooltip=[x_axis, y_axis]
-                            ).interactive()
+                    if chart_type == "Line":
+                        chart = alt.Chart(chart_data).mark_line().encode(
+                            x=x_col,
+                            y=y_col,
+                            tooltip=[x_col, y_col]
+                        ).interactive()
+                    elif chart_type == "Bar":
+                        chart = alt.Chart(chart_data).mark_bar().encode(
+                            x=x_col,
+                            y=y_col,
+                            tooltip=[x_col, y_col]
+                        ).interactive()
+                    elif chart_type == "Scatter":
+                        chart = alt.Chart(chart_data).mark_circle(size=60).encode(
+                            x=x_col,
+                            y=y_col,
+                            tooltip=[x_col, y_col]
+                        ).interactive()
 
-                        elif chart_type == "Scatter":
-                            chart = alt.Chart(chart_data).mark_circle(size=60).encode(
-                                x=x_axis,
-                                y=y_axis,
-                                tooltip=[x_axis, y_axis]
-                            ).interactive()
-
-                        st.altair_chart(chart, use_container_width=True)
+                    st.altair_chart(chart, use_container_width=True)
 
     except Exception as e:
         st.error(f"❌ Error processing file: {e}")
