@@ -4,11 +4,22 @@ import altair as alt
 import numpy as np
 from io import StringIO
 
-st.set_page_config(page_title="CSV Cleaner & Multi-Y Chart App", layout="wide")
-st.title("📂 CSV Cleaner & Multi-Y Chart App with Correlation")
+# ----------------------------
+# PAGE CONFIG
+# ----------------------------
+st.set_page_config(page_title="Multi-Y CSV Plotter", page_icon="📊", layout="wide")
 
-# File upload
-uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
+# ----------------------------
+# HEADER
+# ----------------------------
+st.markdown("<h1 style='text-align: center;'>📂 CSV Cleaner & Multi-Y Chart Generator</h1>", unsafe_allow_html=True)
+st.markdown("<h4 style='text-align: center; color: gray;'>Visualize multiple time-series or parameters in one place</h4>", unsafe_allow_html=True)
+st.markdown("---")
+
+# ----------------------------
+# FILE UPLOAD
+# ----------------------------
+uploaded_file = st.file_uploader("📤 Upload your CSV file", type="csv")
 
 # Session state
 if "cleaned_data" not in st.session_state:
@@ -19,42 +30,50 @@ if "show_chart" not in st.session_state:
 if uploaded_file:
     try:
         df = pd.read_csv(uploaded_file)
-        st.success("✅ CSV file uploaded successfully!")
-        st.subheader("🔍 Original Data Preview")
-        st.dataframe(df, use_container_width=True)
+        st.success("✅ File uploaded successfully!")
 
-        if st.button("🧹 Clean File (Remove -9999.0 rows)"):
+        with st.expander("🔍 View Raw Data"):
+            st.dataframe(df, use_container_width=True)
+
+        st.markdown("### 🧹 Data Cleaning")
+
+        if st.button("🚿 Remove rows with `-9999.0`"):
             df_cleaned = df.replace(-9999.0, pd.NA).dropna()
             if df_cleaned.empty:
                 st.warning("⚠️ All rows were removed after cleaning.")
             else:
                 st.session_state.cleaned_data = df_cleaned
                 st.session_state.show_chart = False
-                st.success(f"✅ Cleaned data has {len(df_cleaned)} rows.")
+                st.success(f"✅ Cleaned data contains {len(df_cleaned)} rows.")
 
+        # ----------------------------
+        # POST-CLEANING
+        # ----------------------------
         if st.session_state.cleaned_data is not None:
             df_cleaned = st.session_state.cleaned_data
-            st.subheader("📋 Cleaned Data Preview")
+
+            st.markdown("### 📋 Cleaned Data Preview")
             st.dataframe(df_cleaned, use_container_width=True)
 
-            # Download
+            # Download cleaned CSV
             csv = df_cleaned.to_csv(index=False)
             st.download_button("📥 Download Cleaned CSV", data=csv, file_name="cleaned_file.csv", mime="text/csv")
 
-            # Charting
+            # ----------------------------
+            # CHARTING SECTION
+            # ----------------------------
             st.markdown("---")
-            st.subheader("📊 Create Chart with Multiple Y Columns")
+            st.markdown("### 📊 Chart Creation Panel")
 
             all_cols = df_cleaned.columns.tolist()
 
-            # Column selections
             col1, col2 = st.columns(2)
             with col1:
-                x_col = st.selectbox("🟦 Select X-axis column (any type)", all_cols, key="xcol")
+                x_col = st.selectbox("🟦 Select X-axis column", all_cols, key="xcol")
             with col2:
-                y_cols = st.multiselect("🟥 Select One or More Y-axis Columns (any type)", [col for col in all_cols if col != x_col], key="ycol")
+                y_cols = st.multiselect("🟥 Select One or More Y-axis Columns", [col for col in all_cols if col != x_col], key="ycol")
 
-            chart_type = st.radio("📐 Chart Type", ["Line", "Scatter"], horizontal=True)
+            chart_type = st.radio("📐 Choose Chart Type", ["Line", "Scatter"], horizontal=True)
 
             if st.button("📈 Generate Chart"):
                 if not y_cols:
@@ -63,7 +82,7 @@ if uploaded_file:
                     st.session_state.show_chart = True
 
             if st.session_state.show_chart and y_cols:
-                # Prepare melted dataframe
+                # Prepare melted DataFrame
                 melted_df = pd.DataFrame()
 
                 for y in y_cols:
@@ -79,8 +98,8 @@ if uploaded_file:
                 if melted_df.empty:
                     st.warning("⚠️ No valid Y data to plot.")
                 else:
-                    # Correlation Section
-                    st.markdown("### 🔗 Pearson Correlation (r) between X and each Y")
+                    # Show Correlations
+                    st.markdown("### 🔗 Pearson Correlation (r)")
                     for y in y_cols:
                         try:
                             x_data = pd.to_numeric(df_cleaned[x_col], errors="coerce")
@@ -95,22 +114,29 @@ if uploaded_file:
                             st.markdown(f"• **{y} vs {x_col}**: Cannot compute correlation.")
 
                     # Plotting
-                    if chart_type == "Line":
-                        chart = alt.Chart(melted_df).mark_line().encode(
-                            x=x_col,
-                            y="Value",
-                            color="Variable",
-                            tooltip=[x_col, "Variable", "Value"]
-                        ).interactive()
-                    else:
-                        chart = alt.Chart(melted_df).mark_circle(size=60).encode(
-                            x=x_col,
-                            y="Value",
-                            color="Variable",
-                            tooltip=[x_col, "Variable", "Value"]
-                        ).interactive()
+                    base = alt.Chart(melted_df).encode(
+                        x=alt.X(x_col, title=x_col),
+                        y=alt.Y("Value", title="Y-axis Value"),
+                        color=alt.Color("Variable", legend=alt.Legend(title="Y Variables")),
+                        tooltip=[x_col, "Variable", "Value"]
+                    )
 
-                    st.altair_chart(chart, use_container_width=True)
+                    if chart_type == "Line":
+                        chart = base.mark_line(size=2)
+                    else:
+                        chart = base.mark_circle(size=70, opacity=0.8)
+
+                    st.altair_chart(chart.interactive(), use_container_width=True)
 
     except Exception as e:
         st.error(f"❌ Error processing file: {e}")
+
+# ----------------------------
+# FOOTER
+# ----------------------------
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: gray; font-size: 0.9em;">
+    App developed by <b>Dr. Sachchidanand Singh</b>, Scientist B, NIH-WHRC Jammu
+</div>
+""", unsafe_allow_html=True)
