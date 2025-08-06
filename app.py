@@ -70,13 +70,16 @@ if uploaded_file:
                 st.markdown("### 🔗 Pearson Correlation (r) between X and each Y")
                 for y in y_cols:
                     try:
-                        if np.issubdtype(df_cleaned[x_col].dtype, np.number):
-                            r = np.corrcoef(df_cleaned[x_col], df_cleaned[y])[0, 1]
-                            st.markdown(f"• **{y} vs {x_col}**: `r = {r:.3f}`")
-                        else:
-                            st.markdown(f"• **{y} vs {x_col}**: Cannot compute correlation (non-numeric X)")
+                        x_data = pd.to_numeric(df_cleaned[x_col], errors="coerce")
+                        y_data = df_cleaned[y]
+                    
+                        # Drop NA rows for correlation calc
+                        valid = x_data.notna() & y_data.notna()
+                        r = np.corrcoef(x_data[valid], y_data[valid])[0, 1]
+                        st.markdown(f"• **{y} vs {x_col}**: `r = {r:.3f}`")
                     except Exception as e:
                         st.warning(f"Could not compute correlation for {y}: {e}")
+
 
                 # Chart generation
                 if chart_type == "Line":
