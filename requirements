@@ -3,5 +3,5 @@ pandas
 openpyxl
 xlsxwriter
 altair
-scipy
+scipy==1.13.0
 
