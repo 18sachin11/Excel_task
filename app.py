@@ -4,10 +4,10 @@ import altair as alt
 import numpy as np
 from io import StringIO
 
-st.set_page_config(page_title="CSV Cleaner & Multi-Chart App", layout="wide")
+st.set_page_config(page_title="CSV Cleaner & Multi-Y Chart App", layout="wide")
 st.title("📂 CSV Cleaner & Multi-Y Chart App with Correlation")
 
-# Upload CSV
+# File upload
 uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
 
 # Session state
@@ -37,62 +37,64 @@ if uploaded_file:
             st.subheader("📋 Cleaned Data Preview")
             st.dataframe(df_cleaned, use_container_width=True)
 
-            # Download
+            # Download cleaned CSV
             csv = df_cleaned.to_csv(index=False)
             st.download_button("📥 Download Cleaned CSV", data=csv, file_name="cleaned_file.csv", mime="text/csv")
 
-            # Charting
+            # Charting Section
             st.markdown("---")
             st.subheader("📊 Create Chart with Multiple Y Columns")
 
+            all_cols = df_cleaned.columns.tolist()
             numeric_cols = df_cleaned.select_dtypes(include=["float64", "int64"]).columns.tolist()
 
-            if len(numeric_cols) < 2:
-                st.info("❗ Not enough numeric columns to generate charts.")
-            else:
-                col1, col2 = st.columns(2)
-                with col1:
-                    x_col = st.selectbox("🟦 Select X-axis", numeric_cols, key="xcol")
-                with col2:
-                    y_cols = st.multiselect("🟥 Select One or More Y-axis Columns", [col for col in numeric_cols if col != x_col], key="ycol")
+            col1, col2 = st.columns(2)
+            with col1:
+                x_col = st.selectbox("🟦 Select X-axis column (any type)", all_cols, key="xcol")
+            with col2:
+                y_cols = st.multiselect("🟥 Select One or More Y-axis Columns (numeric only)", numeric_cols, key="ycol")
 
-                chart_type = st.radio("📐 Chart Type", ["Line", "Scatter"], horizontal=True)
+            chart_type = st.radio("📐 Chart Type", ["Line", "Scatter"], horizontal=True)
 
-                if st.button("📈 Generate Chart"):
-                    if not y_cols:
-                        st.warning("❗ Please select at least one Y-axis column.")
-                    else:
-                        st.session_state.show_chart = True
+            if st.button("📈 Generate Chart"):
+                if not y_cols:
+                    st.warning("❗ Please select at least one Y-axis column.")
+                else:
+                    st.session_state.show_chart = True
 
-                if st.session_state.show_chart and y_cols:
-                    melted_df = df_cleaned[[x_col] + y_cols].melt(id_vars=x_col, var_name='Variable', value_name='Value')
+            if st.session_state.show_chart and y_cols:
+                # Melt the data for multi-series plotting
+                melted_df = df_cleaned[[x_col] + y_cols].melt(id_vars=x_col, var_name='Variable', value_name='Value')
 
-                    # Correlation summary
-                    st.markdown("### 🔗 Correlation Coefficients (Pearson r)")
-                    for y in y_cols:
-                        try:
+                # Show correlations
+                st.markdown("### 🔗 Pearson Correlation (r) between X and each Y")
+                for y in y_cols:
+                    try:
+                        if np.issubdtype(df_cleaned[x_col].dtype, np.number):
                             r = np.corrcoef(df_cleaned[x_col], df_cleaned[y])[0, 1]
                             st.markdown(f"• **{y} vs {x_col}**: `r = {r:.3f}`")
-                        except Exception as e:
-                            st.warning(f"Could not compute correlation for {y}: {e}")
+                        else:
+                            st.markdown(f"• **{y} vs {x_col}**: Cannot compute correlation (non-numeric X)")
+                    except Exception as e:
+                        st.warning(f"Could not compute correlation for {y}: {e}")
 
-                    # Chart
-                    if chart_type == "Line":
-                        chart = alt.Chart(melted_df).mark_line().encode(
-                            x=x_col,
-                            y="Value",
-                            color="Variable",
-                            tooltip=[x_col, "Variable", "Value"]
-                        ).interactive()
-                    else:  # Scatter
-                        chart = alt.Chart(melted_df).mark_circle(size=60).encode(
-                            x=x_col,
-                            y="Value",
-                            color="Variable",
-                            tooltip=[x_col, "Variable", "Value"]
-                        ).interactive()
+                # Chart generation
+                if chart_type == "Line":
+                    chart = alt.Chart(melted_df).mark_line().encode(
+                        x=x_col,
+                        y="Value",
+                        color="Variable",
+                        tooltip=[x_col, "Variable", "Value"]
+                    ).interactive()
+                else:  # Scatter
+                    chart = alt.Chart(melted_df).mark_circle(size=60).encode(
+                        x=x_col,
+                        y="Value",
+                        color="Variable",
+                        tooltip=[x_col, "Variable", "Value"]
+                    ).interactive()
 
-                    st.altair_chart(chart, use_container_width=True)
+                st.altair_chart(chart, use_container_width=True)
 
     except Exception as e:
         st.error(f"❌ Error processing file: {e}")
