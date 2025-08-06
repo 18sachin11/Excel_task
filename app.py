@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from io import StringIO
-
+ 
 st.set_page_config(page_title="CSV Cleaner & Chart App", layout="wide")
 st.title("📂 CSV Cleaner & Chart App")
 
