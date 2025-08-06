@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
+import numpy as np
 from io import StringIO
-from scipy.stats import pearsonr
 
 st.set_page_config(page_title="CSV Cleaner & Chart App", layout="wide")
 st.title("📂 CSV Cleaner & Chart App with Correlation")
@@ -64,10 +64,10 @@ if uploaded_file:
                 if st.session_state.show_chart:
                     chart_data = df_cleaned[[x_col, y_col]]
 
-                    # Calculate correlation
+                    # Calculate Pearson correlation using numpy
                     try:
-                        r_value, p_value = pearsonr(chart_data[x_col], chart_data[y_col])
-                        corr_text = f"📌 **Pearson Correlation (r)** between `{x_col}` and `{y_col}`: **{r_value:.3f}** (p = {p_value:.3f})"
+                        r_value = np.corrcoef(chart_data[x_col], chart_data[y_col])[0, 1]
+                        corr_text = f"📌 **Pearson Correlation (r)** between `{x_col}` and `{y_col}`: **{r_value:.3f}**"
                         st.markdown(corr_text)
                     except Exception as e:
                         st.warning(f"⚠️ Could not calculate correlation: {e}")
@@ -91,12 +91,9 @@ if uploaded_file:
                             y=y_col,
                             tooltip=[x_col, y_col]
                         )
-
-                        # Regression line
                         reg_line = base.transform_regression(
                             x_col, y_col, method="linear"
                         ).mark_line(color="red")
-
                         chart = (base + reg_line).interactive()
 
                     st.altair_chart(chart, use_container_width=True)
