@@ -29,6 +29,7 @@ if uploaded_file:
                 st.warning("⚠️ All rows were removed after cleaning.")
             else:
                 st.session_state.cleaned_data = df_cleaned
+                st.session_state.show_chart = False  # Reset chart display state
                 st.success(f"✅ Cleaned data has {len(df_cleaned)} rows.")
 
         if st.session_state.cleaned_data is not None:
@@ -36,7 +37,7 @@ if uploaded_file:
             st.subheader("📋 Cleaned Data Preview")
             st.dataframe(df_cleaned, use_container_width=True)
 
-            # Download option
+            # Download cleaned CSV
             csv = df_cleaned.to_csv(index=False)
             st.download_button(
                 label="📥 Download Cleaned CSV",
@@ -45,34 +46,41 @@ if uploaded_file:
                 mime="text/csv"
             )
 
-            # Chart area
+            # Chart creation section
             st.markdown("---")
             st.subheader("📊 Create Chart with Correlation")
 
+            # Select numeric columns
             numeric_cols = df_cleaned.select_dtypes(include=["float64", "int64"]).columns.tolist()
 
             if len(numeric_cols) < 2:
                 st.info("❗ Not enough numeric columns to generate a chart.")
             else:
-                x_col = st.selectbox("Select X-axis", numeric_cols, key="xcol")
-                y_col = st.selectbox("Select Y-axis", [col for col in numeric_cols if col != x_col], key="ycol")
-                chart_type = st.radio("Select Chart Type", ["Line", "Bar", "Scatter"], horizontal=True)
+                col1, col2 = st.columns(2)
+                with col1:
+                    x_col = st.selectbox("🟦 Select X-axis column", numeric_cols, key="xcol")
+                with col2:
+                    y_options = [col for col in numeric_cols if col != x_col]
+                    y_col = st.selectbox("🟥 Select Y-axis column", y_options, key="ycol")
 
+                chart_type = st.radio("📐 Select Chart Type", ["Line", "Bar", "Scatter"], horizontal=True)
+
+                # Button to trigger chart display
                 if st.button("📈 Generate Chart"):
                     st.session_state.show_chart = True
 
+                # Chart output
                 if st.session_state.show_chart:
                     chart_data = df_cleaned[[x_col, y_col]]
 
-                    # Calculate Pearson correlation using numpy
+                    # Calculate correlation
                     try:
                         r_value = np.corrcoef(chart_data[x_col], chart_data[y_col])[0, 1]
-                        corr_text = f"📌 **Pearson Correlation (r)** between `{x_col}` and `{y_col}`: **{r_value:.3f}**"
-                        st.markdown(corr_text)
+                        st.markdown(f"📌 **Pearson Correlation (r)** between `{x_col}` and `{y_col}`: **{r_value:.3f}**")
                     except Exception as e:
                         st.warning(f"⚠️ Could not calculate correlation: {e}")
 
-                    # Generate chart
+                    # Build the chart
                     if chart_type == "Line":
                         chart = alt.Chart(chart_data).mark_line().encode(
                             x=x_col,
