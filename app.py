@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO, StringIO
 
-st.title("📂 File Cleaner: Remove Rows with -9999.0")
+st.title("📂 File Cleaner")
 
 # Upload section
 uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", "csv"])
